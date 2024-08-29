@@ -4,31 +4,31 @@ package empmanager;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 
 public class EmpleadoManager {
     private RandomAccessFile rcods, remps;
     
     public EmpleadoManager() {
         try {
-            
-            //1) Asegurar que el folder de Company exista
+            // Asegurar que el folder de Company exista
             File mf = new File("company");
             mf.mkdir();
             
-            //2) Instanciar los RAFs dentro del folder Company
+            // Instanciar los RAFs dentro del folder Company
             rcods = new RandomAccessFile("company/codigos.emp", "rw");
             remps = new RandomAccessFile("company/empleados.emp", "rw");
             
-            //3) Inicializar el archivo de codigos, si es nuevo
-            
+            // Inicializar el archivo de codigos, si es nuevo
+            initCodes();
         } catch(IOException e) {
             System.out.println("Error");
         }
     }
     
     private void initCodes() throws IOException {
-        //Cotejar el tamano del array
         if(rcods.length() == 0)
             rcods.writeInt(1);
     }
@@ -42,26 +42,16 @@ public class EmpleadoManager {
         return codigo;
     }
     
-    public void addEmploye(String name, double monto) throws IOException {
+    public void addEmployee(String name, double monto) throws IOException {
         remps.seek(remps.length());
         
-        //Code
         int code = getCode();
         remps.writeInt(code);
-        
-        //Nombre
         remps.writeUTF(name);
-        
-        //Salario
         remps.writeDouble(monto);
-        
-        //Fecha Contratacion
         remps.writeLong(Calendar.getInstance().getTimeInMillis());
-        
-        //Fecha Despido
         remps.writeLong(0);
         
-        //Crear carpeta y archivo individual de cada empleado
         createEmployeeFolders(code);
     }
     
@@ -72,8 +62,6 @@ public class EmpleadoManager {
     private void createEmployeeFolders(int code) throws IOException {
         File edir = new File(employeeFolder(code));
         edir.mkdir();
-        
-        //Crear archivo del empleado
     }
     
     private RandomAccessFile salesFileFor(int code) throws IOException {
@@ -92,5 +80,76 @@ public class EmpleadoManager {
                 raf.writeBoolean(false);
             }
         }
+    }
+    
+    public void listarEmpleadosActivos() throws IOException {
+        SimpleDateFormat formatoFecha = new SimpleDateFormat("dd/MM/yyyy");
+        remps.seek(0);
+        System.out.println("==== Empleados ===");
+        
+        while(remps.getFilePointer() < remps.length()) {
+            int code = remps.readInt();
+            String nombre = remps.readUTF();
+            double salario = remps.readDouble();
+            long fechaContratacion = remps.readLong();
+            long fechaDespido = remps.readLong();
+            
+            if(fechaDespido == 0) {
+                String date = formatoFecha.format(new Date(fechaContratacion));
+                System.out.println("Codigo: " + code + " - Nombre: " + nombre + " - Salario: Lps." 
+                        + salario + " - Fecha de contratacion: " + date);
+            }
+        }
+    }
+    
+    public boolean empleadoActivo(int code) throws IOException {
+        remps.seek(0);
+
+        while(remps.getFilePointer() < remps.length()) {
+            int empCodigo = remps.readInt();
+            String nombre = remps.readUTF();
+            double salario = remps.readDouble();
+            long fechaContratacion = remps.readLong();
+            long fechaDespido = remps.readLong();
+            
+            if(empCodigo == code) {
+                if(fechaDespido == 0) {
+                    System.out.println("Codigo: " + empCodigo);
+                    System.out.println("Nombre: " + nombre);
+                    System.out.println("Salario: " + salario);
+                    System.out.println("Fecha de contratacion: " + new Date(fechaContratacion));
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+    
+    public boolean despedirEmpleado(int code) throws IOException {
+        remps.seek(0);
+        
+        while(remps.getFilePointer() < remps.length()) {
+            int empCodigo = remps.readInt();
+            String nombre = remps.readUTF();
+            double salario = remps.readDouble();
+            long fechaContratacion = remps.readLong();
+            long fechaDespido = remps.readLong();
+            
+            if(empCodigo == code) {
+                if(fechaDespido == 0) {
+                    long currentPosition = remps.getFilePointer();
+                    remps.seek(currentPosition - 8);
+                    remps.writeLong(Calendar.getInstance().getTimeInMillis());
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        
+        System.out.println("El empleado no fue encontrado");
+        return false;
     }
 }
